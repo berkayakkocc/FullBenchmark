@@ -1,0 +1,240 @@
+<UserControl x:Class="FullBenchmark.UI.Views.RunBenchmarkView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:conv="clr-namespace:FullBenchmark.UI.Converters"
+             Background="{StaticResource BgSurfaceBrush}">
+
+    <UserControl.Resources>
+        <conv:BoolToVisibilityConverter  x:Key="BoolToVisible" />
+        <conv:InverseBoolToVisibilityConverter x:Key="BoolToInvisible" />
+        <conv:ScoreToColorConverter      x:Key="ScoreToColor" />
+        <conv:ScoreToProgressConverter   x:Key="ScoreToProgress" />
+        <conv:BadgeToColorConverter      x:Key="BadgeToColor" />
+        <conv:NullableScoreConverter     x:Key="NullScore" />
+    </UserControl.Resources>
+
+    <ScrollViewer>
+        <Grid Margin="32,28,32,28">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="24" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="24" />
+                <RowDefinition Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <!-- Header -->
+            <DockPanel Grid.Row="0">
+                <StackPanel>
+                    <TextBlock Text="Run Benchmark" Style="{StaticResource H1}" />
+                    <TextBlock Text="Configure and run a full system performance test"
+                               Style="{StaticResource SubText}" Margin="0,4,0,0" />
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                            HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                    <Button Content="⏹  Cancel"
+                            Style="{StaticResource DangerButton}"
+                            Command="{Binding CancelCommand}"
+                            Margin="0,0,8,0"
+                            Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisible}}" />
+                    <Button Content="▶  Start Benchmark"
+                            Style="{StaticResource PrimaryButton}"
+                            Command="{Binding StartCommand}"
+                            Visibility="{Binding IsRunning, Converter={StaticResource BoolToInvisible}}" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Config + Progress row -->
+            <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="320" />
+                    <ColumnDefinition Width="20" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Config panel -->
+                <Border Grid.Column="0" Style="{StaticResource Card}"
+                        IsEnabled="{Binding IsRunning, Converter={StaticResource BoolToInvisible}}">
+                    <StackPanel>
+                        <TextBlock Text="TEST CONFIGURATION"
+                                   Style="{StaticResource MutedText}"
+                                   FontSize="10" FontWeight="SemiBold"
+                                   Margin="0,0,0,14" />
+
+                        <TextBlock Text="Enabled Modules" Style="{StaticResource H3}" Margin="0,0,0,8" />
+                        <CheckBox Content="CPU Benchmark"    IsChecked="{Binding CpuEnabled}"    Margin="0,4" />
+                        <CheckBox Content="Memory Benchmark" IsChecked="{Binding MemoryEnabled}" Margin="0,4" />
+                        <CheckBox Content="Disk Benchmark"   IsChecked="{Binding DiskEnabled}"   Margin="0,4" />
+                        <CheckBox Content="GPU Benchmark (unavailable)"
+                                  IsChecked="{Binding GpuEnabled}" IsEnabled="False"
+                                  Opacity="0.5" Margin="0,4" />
+                        <CheckBox Content="Network Benchmark (unavailable)"
+                                  IsChecked="{Binding NetworkEnabled}" IsEnabled="False"
+                                  Opacity="0.5" Margin="0,4" />
+
+                        <Separator Margin="0,12" />
+
+                        <TextBlock Text="Duration Settings" Style="{StaticResource H3}" Margin="0,0,0,10" />
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="80" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="10" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="10" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Grid.Row="0" Grid.Column="0" Text="CPU run seconds"
+                                       Style="{StaticResource StatLabel}" />
+                            <TextBox  Grid.Row="0" Grid.Column="1"
+                                      Text="{Binding CpuRunSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Grid.Row="2" Grid.Column="0" Text="Memory run seconds"
+                                       Style="{StaticResource StatLabel}" />
+                            <TextBox  Grid.Row="2" Grid.Column="1"
+                                      Text="{Binding MemoryRunSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                            <TextBlock Grid.Row="4" Grid.Column="0" Text="Disk file size (MB)"
+                                       Style="{StaticResource StatLabel}" />
+                            <TextBox  Grid.Row="4" Grid.Column="1"
+                                      Text="{Binding DiskFileSizeMb, UpdateSourceTrigger=PropertyChanged}" />
+                        </Grid>
+                    </StackPanel>
+                </Border>
+
+                <!-- Progress panel -->
+                <Border Grid.Column="2" Style="{StaticResource Card}">
+                    <StackPanel>
+                        <TextBlock Text="PROGRESS" Style="{StaticResource MutedText}"
+                                   FontSize="10" FontWeight="SemiBold" Margin="0,0,0,14" />
+
+                        <!-- Overall progress -->
+                        <DockPanel Margin="0,0,0,6">
+                            <TextBlock Text="{Binding ProgressPercent, StringFormat='{}{0:F0}%'}"
+                                       DockPanel.Dock="Right"
+                                       Style="{StaticResource SubText}" />
+                            <TextBlock Text="{Binding CurrentWorkload}"
+                                       Style="{StaticResource BodyText}" FontWeight="SemiBold" />
+                        </DockPanel>
+                        <ProgressBar Value="{Binding ProgressPercent}"
+                                     Maximum="100" Height="10" Margin="0,0,0,6" />
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   Style="{StaticResource SubText}" Margin="0,0,0,14" />
+
+                        <!-- Per-workload items -->
+                        <ItemsControl ItemsSource="{Binding WorkloadProgress}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,3">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="180" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="40" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                                   Style="{StaticResource SubText}"
+                                                   VerticalAlignment="Center" />
+                                        <ProgressBar Grid.Column="1" Value="{Binding Percent}"
+                                                     Maximum="100" Height="5"
+                                                     Margin="8,0" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="2"
+                                                   Text="{Binding Percent, StringFormat='{}{0:F0}%'}"
+                                                   Style="{StaticResource MutedText}"
+                                                   HorizontalAlignment="Right"
+                                                   VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Results panel -->
+            <Border Grid.Row="4" Style="{StaticResource Card}"
+                    Visibility="{Binding HasResults, Converter={StaticResource BoolToVisible}}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="32" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Overall score -->
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                        <TextBlock Text="RESULT" Style="{StaticResource MutedText}"
+                                   FontSize="10" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding OverallScore, StringFormat=F1}"
+                                   FontSize="64" FontWeight="Bold"
+                                   Foreground="{Binding OverallScore, Converter={StaticResource ScoreToColor}}"
+                                   LineHeight="72" />
+                        <TextBlock Text="{Binding Badge}"
+                                   Foreground="{Binding Badge, Converter={StaticResource BadgeToColor}}"
+                                   FontSize="14" FontWeight="SemiBold" />
+                        <TextBlock Text="{Binding CompletionMessage}"
+                                   Style="{StaticResource MutedText}"
+                                   Margin="0,6,0,0" />
+                    </StackPanel>
+
+                    <!-- Category scores -->
+                    <Grid Grid.Column="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="16" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="CPU" Style="{StaticResource MutedText}"
+                                       FontSize="10" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding CpuScore, Converter={StaticResource NullScore}}"
+                                       FontSize="28" FontWeight="Bold"
+                                       Foreground="{Binding CpuScore, Converter={StaticResource ScoreToColor}}" />
+                            <ProgressBar Value="{Binding CpuScore, Converter={StaticResource ScoreToProgress}}"
+                                         Foreground="{Binding CpuScore, Converter={StaticResource ScoreToColor}}"
+                                         Height="6" Margin="0,6,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2">
+                            <TextBlock Text="MEMORY" Style="{StaticResource MutedText}"
+                                       FontSize="10" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding MemScore, Converter={StaticResource NullScore}}"
+                                       FontSize="28" FontWeight="Bold"
+                                       Foreground="{Binding MemScore, Converter={StaticResource ScoreToColor}}" />
+                            <ProgressBar Value="{Binding MemScore, Converter={StaticResource ScoreToProgress}}"
+                                         Foreground="{Binding MemScore, Converter={StaticResource ScoreToColor}}"
+                                         Height="6" Margin="0,6,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="4">
+                            <TextBlock Text="DISK" Style="{StaticResource MutedText}"
+                                       FontSize="10" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding DiskScore, Converter={StaticResource NullScore}}"
+                                       FontSize="28" FontWeight="Bold"
+                                       Foreground="{Binding DiskScore, Converter={StaticResource ScoreToColor}}" />
+                            <ProgressBar Value="{Binding DiskScore, Converter={StaticResource ScoreToProgress}}"
+                                         Foreground="{Binding DiskScore, Converter={StaticResource ScoreToColor}}"
+                                         Height="6" Margin="0,6,0,0" />
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="6">
+                            <TextBlock Text="GPU" Style="{StaticResource MutedText}"
+                                       FontSize="10" FontWeight="SemiBold" Margin="0,0,0,4" />
+                            <TextBlock Text="{Binding GpuScore, Converter={StaticResource NullScore}}"
+                                       FontSize="28" FontWeight="Bold"
+                                       Foreground="{Binding GpuScore, Converter={StaticResource ScoreToColor}}" />
+                            <ProgressBar Value="{Binding GpuScore, Converter={StaticResource ScoreToProgress}}"
+                                         Foreground="{Binding GpuScore, Converter={StaticResource ScoreToColor}}"
+                                         Height="6" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

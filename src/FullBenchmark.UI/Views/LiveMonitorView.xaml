@@ -1,0 +1,232 @@
+<UserControl x:Class="FullBenchmark.UI.Views.LiveMonitorView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:lvc="clr-namespace:LiveChartsCore.SkiaSharpView.WPF;assembly=LiveChartsCore.SkiaSharpView.WPF"
+             Background="{StaticResource BgSurfaceBrush}">
+
+    <Grid Margin="32,28,32,28">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="16" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="20" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <DockPanel Grid.Row="0">
+            <TextBlock Text="Live Monitor" Style="{StaticResource H1}" />
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal"
+                        HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                <Button Content="⏹  Stop"
+                        Style="{StaticResource SecondaryButton}"
+                        Command="{Binding StopCommand}"
+                        Margin="0,0,8,0"
+                        Visibility="{Binding IsRunning, Converter={StaticResource BoolToVisible}}" />
+                <Button Content="▶  Start"
+                        Style="{StaticResource PrimaryButton}"
+                        Command="{Binding StartCommand}"
+                        Visibility="{Binding IsRunning, Converter={StaticResource BoolToInvisible}}" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Status bar -->
+        <Border Grid.Row="2" Background="{StaticResource BgCardBrush}"
+                CornerRadius="6" Padding="12,6">
+            <TextBlock Text="{Binding StatusText}"
+                       Style="{StaticResource SubText}" />
+        </Border>
+
+        <!-- Live gauge row + charts -->
+        <ScrollViewer Grid.Row="4">
+            <StackPanel>
+                <!-- Gauge row -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="12" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- CPU -->
+                    <Border Grid.Column="0" Style="{StaticResource Card}">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="CPU" Style="{StaticResource MutedText}"
+                                       FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock HorizontalAlignment="Center" Margin="0,4,0,2">
+                                <Run Text="{Binding CpuUsage, StringFormat=F1}"
+                                     FontSize="32" FontWeight="Bold"
+                                     Foreground="{StaticResource AccentBrush}" />
+                                <Run Text="%" Foreground="{StaticResource TextSecondaryBrush}" FontSize="16" />
+                            </TextBlock>
+                            <ProgressBar Value="{Binding CpuUsage}"
+                                         Maximum="100" Height="6" Margin="0,4,0,4" />
+                            <TextBlock Text="{Binding CpuTempC, StringFormat='{}{0:F0} °C'}"
+                                       Style="{StaticResource SubText}"
+                                       HorizontalAlignment="Center"
+                                       Visibility="{Binding CpuTempC, Converter={StaticResource NullToCollapsed}}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- RAM -->
+                    <Border Grid.Column="2" Style="{StaticResource Card}">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="MEMORY" Style="{StaticResource MutedText}"
+                                       FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock HorizontalAlignment="Center" Margin="0,4,0,2">
+                                <Run Text="{Binding RamUsagePercent, StringFormat=F1}"
+                                     FontSize="32" FontWeight="Bold"
+                                     Foreground="{StaticResource InfoBrush}" />
+                                <Run Text="%" Foreground="{StaticResource TextSecondaryBrush}" FontSize="16" />
+                            </TextBlock>
+                            <ProgressBar Value="{Binding RamUsagePercent}"
+                                         Foreground="{StaticResource InfoBrush}"
+                                         Maximum="100" Height="6" Margin="0,4,0,4" />
+                            <TextBlock HorizontalAlignment="Center" Style="{StaticResource SubText}">
+                                <Run Text="{Binding RamUsedGb, StringFormat=F1}" />
+                                <Run Text=" / " />
+                                <Run Text="{Binding RamTotalGb, StringFormat=F1}" />
+                                <Run Text=" GB" />
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Disk -->
+                    <Border Grid.Column="4" Style="{StaticResource Card}">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="DISK" Style="{StaticResource MutedText}"
+                                       FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock HorizontalAlignment="Center" Margin="0,4,0,2">
+                                <Run Text="{Binding DiskActivePercent, StringFormat=F1}"
+                                     FontSize="32" FontWeight="Bold"
+                                     Foreground="{StaticResource WarningBrush}" />
+                                <Run Text="%" Foreground="{StaticResource TextSecondaryBrush}" FontSize="16" />
+                            </TextBlock>
+                            <ProgressBar Value="{Binding DiskActivePercent}"
+                                         Foreground="{StaticResource WarningBrush}"
+                                         Maximum="100" Height="6" Margin="0,4,0,4" />
+                            <TextBlock HorizontalAlignment="Center" Style="{StaticResource SubText}">
+                                <Run Text="R: " /><Run Text="{Binding DiskReadMbps, StringFormat=F1}" /><Run Text=" MB/s  " />
+                                <Run Text="W: " /><Run Text="{Binding DiskWriteMbps, StringFormat=F1}" /><Run Text=" MB/s" />
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Network -->
+                    <Border Grid.Column="6" Style="{StaticResource Card}">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="NETWORK" Style="{StaticResource MutedText}"
+                                       FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock HorizontalAlignment="Center" Margin="0,4,0,2">
+                                <Run Text="{Binding NetRecvMbps, StringFormat=F2}"
+                                     FontSize="32" FontWeight="Bold"
+                                     Foreground="{StaticResource SuccessBrush}" />
+                                <Run Text=" MB/s" Foreground="{StaticResource TextSecondaryBrush}" FontSize="13" />
+                            </TextBlock>
+                            <ProgressBar Value="0" Maximum="100" Height="6" Margin="0,4,0,4"
+                                         Foreground="{StaticResource SuccessBrush}" Opacity="0.3" />
+                            <TextBlock HorizontalAlignment="Center" Style="{StaticResource SubText}">
+                                <Run Text="↑ " /><Run Text="{Binding NetSentMbps, StringFormat=F2}" /><Run Text=" MB/s" />
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- GPU -->
+                    <Border Grid.Column="8" Style="{StaticResource Card}">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="GPU" Style="{StaticResource MutedText}"
+                                       FontSize="10" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock HorizontalAlignment="Center" Margin="0,4,0,2">
+                                <Run Text="{Binding GpuUsage, StringFormat=F1, TargetNullValue='N/A'}"
+                                     FontSize="32" FontWeight="Bold"
+                                     Foreground="{StaticResource DangerBrush}" />
+                                <Run Text="{Binding GpuUsage, Converter={StaticResource NullToPercent}}"
+                                     Foreground="{StaticResource TextSecondaryBrush}" FontSize="16" />
+                            </TextBlock>
+                            <ProgressBar Value="{Binding GpuUsage, TargetNullValue=0}"
+                                         Foreground="{StaticResource DangerBrush}"
+                                         Maximum="100" Height="6" Margin="0,4,0,4" />
+                            <TextBlock Text="{Binding GpuTempC, StringFormat='{}{0:F0} °C', TargetNullValue='No sensor'}"
+                                       Style="{StaticResource SubText}"
+                                       HorizontalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <Rectangle Height="1" Fill="{StaticResource SeparatorBrush}" Margin="0,20,0,16" />
+
+                <!-- Charts grid -->
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="160" />
+                        <RowDefinition Height="16" />
+                        <RowDefinition Height="160" />
+                    </Grid.RowDefinitions>
+
+                    <!-- CPU chart -->
+                    <Border Grid.Column="0" Grid.Row="0" Style="{StaticResource Card}" Padding="12">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="CPU Usage (%)"
+                                       Style="{StaticResource SubText}" Margin="0,0,0,6" />
+                            <lvc:CartesianChart Series="{Binding CpuChartSeries}"
+                                               XAxes="{Binding TimeAxis}"
+                                               YAxes="{Binding PercentAxis}"
+                                               AnimationsSpeed="0:0:0.1"
+                                               Background="Transparent" />
+                        </DockPanel>
+                    </Border>
+
+                    <!-- RAM chart -->
+                    <Border Grid.Column="2" Grid.Row="0" Style="{StaticResource Card}" Padding="12">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Memory Usage (%)"
+                                       Style="{StaticResource SubText}" Margin="0,0,0,6" />
+                            <lvc:CartesianChart Series="{Binding RamChartSeries}"
+                                               XAxes="{Binding TimeAxis}"
+                                               YAxes="{Binding PercentAxis}"
+                                               AnimationsSpeed="0:0:0.1"
+                                               Background="Transparent" />
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Disk chart -->
+                    <Border Grid.Column="0" Grid.Row="2" Style="{StaticResource Card}" Padding="12">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Disk Active Time (%)"
+                                       Style="{StaticResource SubText}" Margin="0,0,0,6" />
+                            <lvc:CartesianChart Series="{Binding DiskChartSeries}"
+                                               XAxes="{Binding TimeAxis}"
+                                               YAxes="{Binding PercentAxis}"
+                                               AnimationsSpeed="0:0:0.1"
+                                               Background="Transparent" />
+                        </DockPanel>
+                    </Border>
+
+                    <!-- Network chart -->
+                    <Border Grid.Column="2" Grid.Row="2" Style="{StaticResource Card}" Padding="12">
+                        <DockPanel>
+                            <TextBlock DockPanel.Dock="Top" Text="Network Received (MB/s)"
+                                       Style="{StaticResource SubText}" Margin="0,0,0,6" />
+                            <lvc:CartesianChart Series="{Binding NetworkChartSeries}"
+                                               XAxes="{Binding TimeAxis}"
+                                               YAxes="{Binding BytesAxis}"
+                                               AnimationsSpeed="0:0:0.1"
+                                               Background="Transparent" />
+                        </DockPanel>
+                    </Border>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
