@@ -21,6 +21,21 @@ Veritabanı ve loglar: `%LOCALAPPDATA%\FullBenchmark\`
 
 Ayrıntılı mimari, modül durumu ve test senaryoları için [PROJECT_STATUS.md](PROJECT_STATUS.md) dosyasına bakın.
 
+## GitHub’a paylaşma
+
+Bu klasörde Git deposu hazır (`main` dalında ilk commit mevcut). Henüz **uzak depo bağlı değilse**:
+
+1. [GitHub](https://github.com/new) üzerinde **boş** bir depo oluşturun (README / .gitignore eklemeyin).
+2. Yerelde (kendi kullanıcı ve depo adınızla):
+
+```bash
+cd path/to/FullBenchmark
+git remote add origin https://github.com/KULLANICI_ADINIZ/DEPO_ADI.git
+git push -u origin main
+```
+
+**GitHub CLI** kullanıyorsanız: `gh auth login` sonrası proje kökünde `gh repo create FullBenchmark --public --source=. --remote=origin --push` de tek adımda oluşturup gönderebilirsiniz.
+
 ## Lisans
 
 [MIT](LICENSE)
