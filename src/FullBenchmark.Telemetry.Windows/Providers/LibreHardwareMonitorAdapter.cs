@@ -1,5 +1,7 @@
 using LibreHardwareMonitor.Hardware;
 using Microsoft.Extensions.Logging;
+using System.IO;
+using System.Text.Json;
 
 namespace FullBenchmark.Telemetry.Windows.Providers;
 
@@ -15,6 +17,7 @@ namespace FullBenchmark.Telemetry.Windows.Providers;
 public sealed class LibreHardwareMonitorAdapter : IDisposable
 {
     private readonly ILogger<LibreHardwareMonitorAdapter> _logger;
+    private const string AgentDebugLogPath = "C:/Users/tr/OneDrive/Documents/GitHub/FullBenchmark/debug-969090.log";
 
     private Computer? _computer;
     private bool      _available;
@@ -37,7 +40,7 @@ public sealed class LibreHardwareMonitorAdapter : IDisposable
                 IsCpuEnabled    = true,
                 IsGpuEnabled    = true,
                 IsMemoryEnabled = false,   // RAM usage read via GlobalMemoryStatusEx (faster + no privilege)
-                IsMotherboardEnabled = false,
+                IsMotherboardEnabled = true, // Some systems expose CPU temp via motherboard/EC sensors.
                 IsStorageEnabled     = false,
                 IsNetworkEnabled     = false,
                 IsBatteryEnabled     = false,
@@ -68,6 +71,9 @@ public sealed class LibreHardwareMonitorAdapter : IDisposable
     /// </summary>
     public SensorReading ReadSensors()
     {
+        #region agent log
+        AgentDebugLog("baseline", "H1", "LibreHardwareMonitorAdapter.ReadSensors:71", "ReadSensors entry", new { available = _available, hasComputer = _computer is not null, initialized = _initialized });
+        #endregion
         if (!_available || _computer is null)
             return new SensorReading(null, null, null, null);
 
@@ -78,9 +84,11 @@ public sealed class LibreHardwareMonitorAdapter : IDisposable
 
             foreach (var hw in _computer.Hardware)
             {
-                hw.Update();
+                UpdateHardwareRecursive(hw);
 
                 if (hw.HardwareType == HardwareType.Cpu)
+                    cpuTemp = ExtractCpuTemp(hw);
+                else if (hw.HardwareType == HardwareType.Motherboard && cpuTemp is null)
                     cpuTemp = ExtractCpuTemp(hw);
                 else if (hw.HardwareType is HardwareType.GpuNvidia
                                          or HardwareType.GpuAmd
@@ -88,18 +96,24 @@ public sealed class LibreHardwareMonitorAdapter : IDisposable
                     (gpuLoad, gpuTemp, gpuMem) = ExtractGpuMetrics(hw);
             }
 
+            #region agent log
+            AgentDebugLog("baseline", "H1", "LibreHardwareMonitorAdapter.ReadSensors:91", "ReadSensors result", new { cpuTemp, gpuTemp, gpuLoad, gpuMem, hardwareCount = _computer.Hardware.Count });
+            #endregion
             return new SensorReading(cpuTemp, gpuLoad, gpuTemp, gpuMem);
         }
         catch (Exception ex)
         {
             _logger.LogTrace(ex, "LibreHardwareMonitor sensor read failed");
+            #region agent log
+            AgentDebugLog("baseline", "H2", "LibreHardwareMonitorAdapter.ReadSensors:96", "ReadSensors exception", new { error = ex.GetType().Name, message = ex.Message });
+            #endregion
             return new SensorReading(null, null, null, null);
         }
     }
 
     private static double? ExtractCpuTemp(IHardware hw)
     {
-        var sensors = hw.Sensors.Where(s => s.SensorType == SensorType.Temperature).ToList();
+        var sensors = EnumerateTemperatureSensors(hw).ToList();
 
         // Prefer "CPU Package" or "Core (Tdie)" as the representative temperature
         var packageSensor = sensors.FirstOrDefault(
@@ -108,7 +122,64 @@ public sealed class LibreHardwareMonitorAdapter : IDisposable
               || s.Name.Contains("CPU",     StringComparison.OrdinalIgnoreCase));
 
         var sensor = packageSensor ?? sensors.FirstOrDefault();
-        return sensor?.Value is float v ? (double?)v : null;
+        double? selectedValue = sensor?.Value is float sv ? sv : null;
+        // Some systems expose placeholder 0C values; treat them as invalid and fallback.
+        if (selectedValue is <= 0)
+        {
+            sensor = sensors.FirstOrDefault(s => s.Value is float v && v > 0 && v < 150);
+            selectedValue = sensor?.Value is float fv ? fv : null;
+        }
+        #region agent log
+        AgentDebugLog("baseline", "H3", "LibreHardwareMonitorAdapter.ExtractCpuTemp:118", "CPU temperature sensor resolution", new
+        {
+            hardwareName = hw.Name,
+            temperatureSensorCount = sensors.Count,
+            selectedSensor = sensor?.Name,
+            selectedValue,
+            candidates = sensors.Select(s => new { s.Name, value = s.Value }).ToArray()
+        });
+        #endregion
+        return selectedValue;
+    }
+
+    private static IEnumerable<ISensor> EnumerateTemperatureSensors(IHardware hw)
+    {
+        foreach (var sensor in hw.Sensors.Where(s => s.SensorType == SensorType.Temperature))
+            yield return sensor;
+
+        foreach (var sub in hw.SubHardware)
+        {
+            foreach (var sensor in EnumerateTemperatureSensors(sub))
+                yield return sensor;
+        }
+    }
+
+    private static void UpdateHardwareRecursive(IHardware hw)
+    {
+        hw.Update();
+        foreach (var sub in hw.SubHardware)
+            UpdateHardwareRecursive(sub);
+    }
+
+    private static void AgentDebugLog(string runId, string hypothesisId, string location, string message, object data)
+    {
+        try
+        {
+            var payload = new
+            {
+                sessionId = "969090",
+                runId,
+                hypothesisId,
+                location,
+                message,
+                data,
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            };
+            File.AppendAllText(AgentDebugLogPath, JsonSerializer.Serialize(payload) + Environment.NewLine);
+        }
+        catch
+        {
+        }
     }
 
     private static (double? load, double? temp, long? memUsed) ExtractGpuMetrics(IHardware hw)

@@ -8,6 +8,8 @@ using LiveChartsCore.SkiaSharpView;
 using LiveChartsCore.SkiaSharpView.Painting;
 using SkiaSharp;
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Text.Json;
 using System.Windows;
 using WpfApp = System.Windows.Application;
 
@@ -17,6 +19,7 @@ public sealed partial class LiveMonitorViewModel : ObservableObject, INavigatedT
 {
     private readonly TelemetryOrchestrator _telemetry;
     private readonly SystemInfoService     _systemInfo;
+    private const string AgentDebugLogPath = "C:/Users/tr/OneDrive/Documents/GitHub/FullBenchmark/debug-969090.log";
     private bool _disposed;
 
     // Ring-buffer collections for charts (100 points each)
@@ -105,6 +108,9 @@ public sealed partial class LiveMonitorViewModel : ObservableObject, INavigatedT
 
     private void OnSampleArrived(object? _, TelemetrySample s)
     {
+        #region agent log
+        AgentDebugLog("baseline", "H5", "LiveMonitorViewModel.OnSampleArrived:109", "UI sample arrived", new { s.CpuTemperatureCelsius, s.GpuTemperatureCelsius, s.CpuUsagePercent });
+        #endregion
         WpfApp.Current.Dispatcher.BeginInvoke(() =>
         {
             // CPU
@@ -135,12 +141,36 @@ public sealed partial class LiveMonitorViewModel : ObservableObject, INavigatedT
             CpuTempC    = s.CpuTemperatureCelsius;
             GpuUsage    = s.GpuUsagePercent;
             GpuTempC    = s.GpuTemperatureCelsius;
+            #region agent log
+            AgentDebugLog("baseline", "H5", "LiveMonitorViewModel.OnSampleArrived:141", "UI property assignment", new { CpuTempC, GpuTempC, GpuUsage });
+            #endregion
             if (s.GpuUsagePercent.HasValue) Push(_gpuSeries, s.GpuUsagePercent.Value);
 
             // Power
             IsOnAcPower    = s.IsOnAcPower ?? true;
             BatteryPercent = s.BatteryChargePercent;
         });
+    }
+
+    private static void AgentDebugLog(string runId, string hypothesisId, string location, string message, object data)
+    {
+        try
+        {
+            var payload = new
+            {
+                sessionId = "969090",
+                runId,
+                hypothesisId,
+                location,
+                message,
+                data,
+                timestamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+            };
+            File.AppendAllText(AgentDebugLogPath, JsonSerializer.Serialize(payload) + Environment.NewLine);
+        }
+        catch
+        {
+        }
     }
 
     // ── Chart helpers ──────────────────────────────────────────────────────
